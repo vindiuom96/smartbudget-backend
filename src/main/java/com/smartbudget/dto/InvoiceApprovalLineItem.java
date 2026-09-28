@@ -1,0 +1,20 @@
+package com.smartbudget.dto;
+
+import java.math.BigDecimal;
+
+public record InvoiceApprovalLineItem(
+        String productCode,
+        String description,
+        String brand,
+        String packSize,
+        String unit,
+
+        BigDecimal quantity,
+        BigDecimal unitPrice,
+
+        BigDecimal lineExGst,
+        BigDecimal gstValue,
+        BigDecimal lineTotal,
+
+        Integer pageNumber) {
+}
