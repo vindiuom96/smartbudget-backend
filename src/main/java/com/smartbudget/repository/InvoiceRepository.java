@@ -1,6 +1,7 @@
 package com.smartbudget.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
@@ -29,6 +30,17 @@ public class InvoiceRepository {
                 TableSchema.fromBean(
                         InvoiceEntity.class));
     }
+    public Optional<InvoiceEntity> findByUserAndInvoiceId(
+        String userSub,
+        String invoiceId) {
+
+    return findAllByUser(userSub)
+            .stream()
+            .filter(invoice ->
+                    invoiceId.equals(
+                            invoice.getInvoiceId()))
+            .findFirst();
+}
 
     public void save(InvoiceEntity invoice) {
 
