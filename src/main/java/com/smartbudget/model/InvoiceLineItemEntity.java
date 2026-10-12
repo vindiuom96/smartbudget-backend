@@ -19,6 +19,10 @@ public class InvoiceLineItemEntity {
     private BigDecimal gstValue;
     private BigDecimal lineTotal;
 
+    private BigDecimal normalizedQuantity;
+    private String normalizedUnit;
+    private BigDecimal normalizedUnitPrice;
+
     private Integer pageNumber;
 
     public String getProductCode() {
@@ -107,5 +111,32 @@ public class InvoiceLineItemEntity {
 
     public void setPageNumber(Integer pageNumber) {
         this.pageNumber = pageNumber;
+    }
+
+    public BigDecimal getNormalizedQuantity() {
+        return normalizedQuantity;
+    }
+
+    public void setNormalizedQuantity(
+            BigDecimal normalizedQuantity) {
+        this.normalizedQuantity = normalizedQuantity;
+    }
+
+    public String getNormalizedUnit() {
+        return normalizedUnit;
+    }
+
+    public void setNormalizedUnit(
+            String normalizedUnit) {
+        this.normalizedUnit = normalizedUnit;
+    }
+
+    public BigDecimal getNormalizedUnitPrice() {
+        return normalizedUnitPrice;
+    }
+
+    public void setNormalizedUnitPrice(
+            BigDecimal normalizedUnitPrice) {
+        this.normalizedUnitPrice = normalizedUnitPrice;
     }
 }

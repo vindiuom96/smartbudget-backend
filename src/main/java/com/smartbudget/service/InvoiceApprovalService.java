@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.smartbudget.dto.InvoiceApprovalLineItem;
 import com.smartbudget.dto.InvoiceApprovalRequest;
 import com.smartbudget.dto.InvoiceApprovalResponse;
+import com.smartbudget.dto.PackUnitNormalizationResult;
 import com.smartbudget.dto.SupplierResolution;
 import com.smartbudget.model.InvoiceEntity;
 import com.smartbudget.model.InvoiceLineItemEntity;
@@ -26,15 +27,18 @@ public class InvoiceApprovalService {
         private final InvoiceRepository invoiceRepository;
         private final SupplierNormalizationService supplierNormalizationService;
         private final InvoiceValidationService invoiceValidationService;
+        private final PackUnitNormalizationService packUnitNormalizationService;
 
         public InvoiceApprovalService(
                         InvoiceRepository invoiceRepository,
                         SupplierNormalizationService supplierNormalizationService,
-                        InvoiceValidationService invoiceValidationService) {
+                        InvoiceValidationService invoiceValidationService,
+                        PackUnitNormalizationService packUnitNormalizationService) {
 
                 this.invoiceRepository = invoiceRepository;
                 this.supplierNormalizationService = supplierNormalizationService;
                 this.invoiceValidationService = invoiceValidationService;
+                this.packUnitNormalizationService = packUnitNormalizationService;
         }
 
         public InvoiceApprovalResponse approve(
@@ -305,6 +309,20 @@ public class InvoiceApprovalService {
 
                         entity.setPageNumber(
                                         item.pageNumber());
+                        PackUnitNormalizationResult normalization = packUnitNormalizationService.normalize(
+                                        item.quantity(),
+                                        item.unit(),
+                                        item.packSize(),
+                                        item.lineExGst());
+
+                        entity.setNormalizedQuantity(
+                                        normalization.normalizedQuantity());
+
+                        entity.setNormalizedUnit(
+                                        normalization.normalizedUnit());
+
+                        entity.setNormalizedUnitPrice(
+                                        normalization.normalizedUnitPrice());
 
                         entities.add(entity);
                 }
