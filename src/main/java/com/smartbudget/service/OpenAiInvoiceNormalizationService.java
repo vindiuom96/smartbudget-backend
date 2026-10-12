@@ -16,7 +16,18 @@ import com.smartbudget.dto.OpenAiRawLineItem;
 @Service
 public class OpenAiInvoiceNormalizationService {
 
-        private static final BigDecimal TOLERANCE = new BigDecimal("0.02");
+        private static final BigDecimal MONEY_TOTAL_TOLERANCE = new BigDecimal("0.001");
+
+        private static final BigDecimal MIN_LINE_CALCULATION_TOLERANCE = new BigDecimal("0.02");
+
+        private static final BigDecimal HALF_CENT = new BigDecimal("0.005");
+
+        private enum GenericAmountMeaning {
+                NONE,
+                ZERO_GST,
+                EX_GST,
+                UNKNOWN
+        }
 
         public InvoiceReviewResponse normalize(
                         OpenAiRawInvoiceResponse raw) {
@@ -24,46 +35,57 @@ public class OpenAiInvoiceNormalizationService {
                 List<String> invoiceWarnings = new ArrayList<>();
 
                 BigDecimal subtotal = raw.subtotalExGst();
+
                 BigDecimal gst = raw.gst();
+
                 BigDecimal total = raw.total();
 
                 /*
-                 * Safe deterministic rule:
-                 *
                  * If subtotal and total are explicitly printed
-                 * and they are equal, GST must mathematically be zero.
+                 * and equal, GST is mathematically zero.
                  */
                 if (gst == null
                                 && subtotal != null
                                 && total != null
-                                && closeEnough(subtotal, total)) {
+                                && moneyMatches(
+                                                subtotal,
+                                                total)) {
 
                         gst = BigDecimal.ZERO;
+                }
+                /*
+                 * If GST is explicitly zero and total is present,
+                 * a missing subtotal can be recovered safely.
+                 *
+                 * subtotal + 0 = total
+                 * therefore subtotal = total.
+                 */
+                if (subtotal == null
+                                && isZero(gst)
+                                && total != null) {
+
+                        subtotal = total;
                 }
 
                 /*
                  * Fallback for invoices where OpenAI reads the final total
-                 * and the line values, but misses the printed subtotal/GST.
-                 *
-                 * We only apply this when EVERY line can be reconstructed and
-                 * the reconstructed amount matches the printed invoice total.
-                 *
-                 * Generic amount fields do not prove by themselves that GST is
-                 * zero, so this fallback intentionally leaves a review warning.
-                 * The chef can confirm GST is zero and revalidate before saving.
+                 * and every row can be reconstructed, but misses the
+                 * printed subtotal/GST.
                  */
                 if (subtotal == null
                                 && gst == null
                                 && total != null) {
 
-                        BigDecimal reconstructedSubtotal = reconstructPossibleZeroGstSubtotal(raw);
+                        BigDecimal reconstructedSubtotal = reconstructPossibleZeroGstSubtotal(
+                                        raw);
 
                         if (reconstructedSubtotal != null
-                                        && closeEnough(
+                                        && moneyMatches(
                                                         reconstructedSubtotal,
                                                         total)) {
 
                                 subtotal = reconstructedSubtotal;
+
                                 gst = BigDecimal.ZERO;
 
                                 invoiceWarnings.add(
@@ -73,6 +95,11 @@ public class OpenAiInvoiceNormalizationService {
                                                                 + "Please confirm GST is zero.");
                         }
                 }
+
+                GenericAmountMeaning genericAmountMeaning = determineGenericAmountMeaning(
+                                raw,
+                                subtotal,
+                                gst);
 
                 validateHeader(
                                 raw,
@@ -90,7 +117,8 @@ public class OpenAiInvoiceNormalizationService {
                                 items.add(
                                                 normalizeLineItem(
                                                                 rawItem,
-                                                                gst));
+                                                                gst,
+                                                                genericAmountMeaning));
                         }
                 }
 
@@ -125,43 +153,53 @@ public class OpenAiInvoiceNormalizationService {
 
         private InvoiceLineItemReview normalizeLineItem(
                         OpenAiRawLineItem raw,
-                        BigDecimal invoiceGst) {
+                        BigDecimal invoiceGst,
+                        GenericAmountMeaning genericAmountMeaning) {
 
                 List<String> warnings = new ArrayList<>();
 
                 BigDecimal lineExGst = raw.lineExGst();
+
                 BigDecimal gstValue = raw.gstValue();
+
                 BigDecimal lineTotal = raw.lineTotal();
 
                 /*
-                 * Generic AMOUNT handling.
-                 *
-                 * Only convert it automatically when
-                 * the whole invoice has zero GST.
+                 * Interpret an ambiguous row Amount/Value/Total only when
+                 * invoice-level arithmetic makes the meaning deterministic.
                  */
                 if (raw.amount() != null
                                 && lineExGst == null
                                 && gstValue == null
                                 && lineTotal == null) {
 
-                        if (isZero(invoiceGst)) {
+                        if (genericAmountMeaning == GenericAmountMeaning.ZERO_GST) {
 
                                 lineExGst = raw.amount();
+
                                 gstValue = BigDecimal.ZERO;
+
                                 lineTotal = raw.amount();
+
+                        } else if (genericAmountMeaning == GenericAmountMeaning.EX_GST) {
+
+                                /*
+                                 * Example: Peters prints GST only at invoice level.
+                                 * The row totals sum exactly to the printed ex-GST
+                                 * subtotal, so they are safe to use as lineExGst.
+                                 */
+                                lineExGst = raw.amount();
 
                         } else {
 
                                 warnings.add(
                                                 "Generic amount cannot be safely classified "
-                                                                + "because invoice GST could not be confirmed as zero.");
+                                                                + "from the invoice totals.");
                         }
                 }
 
                 /*
-                 * If GST has already been established as zero and OpenAI also
-                 * missed the generic amount, quantity * unitPrice can reconstruct
-                 * the line amount deterministically.
+                 * Zero-GST fallback if there is no generic amount.
                  */
                 if (isZero(invoiceGst)
                                 && raw.amount() == null
@@ -176,14 +214,12 @@ public class OpenAiInvoiceNormalizationService {
                                                         raw.unitPrice());
 
                         lineExGst = calculatedLineAmount;
+
                         gstValue = BigDecimal.ZERO;
+
                         lineTotal = calculatedLineAmount;
                 }
 
-                /*
-                 * Seeing both a generic amount and explicit
-                 * GST-specific values is suspicious.
-                 */
                 if (raw.amount() != null
                                 && (raw.lineExGst() != null
                                                 || raw.gstValue() != null
@@ -212,50 +248,31 @@ public class OpenAiInvoiceNormalizationService {
                                         "Line item unit price is missing.");
                 }
 
+                /*
+                 * SmartBudget requires a line ex-GST amount for
+                 * subtotal reconciliation and future price analytics.
+                 *
+                 * Line GST and line total are optional because some
+                 * suppliers print GST only at invoice level.
+                 */
                 if (lineExGst == null) {
 
                         warnings.add(
                                         "Line ex-GST value is missing.");
                 }
 
-                if (gstValue == null) {
-
-                        warnings.add(
-                                        "Line GST value is missing.");
-                }
-
-                if (lineTotal == null) {
-
-                        warnings.add(
-                                        "Line total is missing.");
-                }
-
-                /*
-                 * Financial validation:
-                 *
-                 * quantity * unitPrice ~= lineExGst
-                 */
                 if (raw.quantity() != null
                                 && raw.unitPrice() != null
-                                && lineExGst != null) {
+                                && lineExGst != null
+                                && !lineCalculationMatches(
+                                                raw.quantity(),
+                                                raw.unitPrice(),
+                                                lineExGst)) {
 
-                        BigDecimal calculated = raw.quantity()
-                                        .multiply(
-                                                        raw.unitPrice());
-
-                        if (!closeEnough(
-                                        calculated,
-                                        lineExGst)) {
-
-                                warnings.add(
-                                                "Quantity x unit price does not "
-                                                                + "match line ex-GST value.");
-                        }
+                        warnings.add(
+                                        "Quantity x unit price does not match line ex-GST value.");
                 }
 
-                /*
-                 * lineExGst + GST ~= lineTotal
-                 */
                 if (lineExGst != null
                                 && gstValue != null
                                 && lineTotal != null) {
@@ -263,7 +280,7 @@ public class OpenAiInvoiceNormalizationService {
                         BigDecimal calculated = lineExGst.add(
                                         gstValue);
 
-                        if (!closeEnough(
+                        if (!moneyMatches(
                                         calculated,
                                         lineTotal)) {
 
@@ -286,14 +303,71 @@ public class OpenAiInvoiceNormalizationService {
                                 lineExGst,
                                 gstValue,
                                 lineTotal,
-
-                                // We deliberately do not trust an
-                                // AI-generated confidence score.
                                 null,
-
                                 needsReview,
                                 raw.pageNumber(),
                                 warnings);
+        }
+
+        private GenericAmountMeaning determineGenericAmountMeaning(
+                        OpenAiRawInvoiceResponse raw,
+                        BigDecimal subtotal,
+                        BigDecimal gst) {
+
+                if (raw.items() == null
+                                || raw.items().isEmpty()) {
+
+                        return GenericAmountMeaning.NONE;
+                }
+
+                boolean hasGenericAmount = false;
+
+                BigDecimal possibleExGstSum = BigDecimal.ZERO;
+
+                for (OpenAiRawLineItem item : raw.items()) {
+
+                        if (item.lineExGst() != null) {
+
+                                possibleExGstSum = possibleExGstSum.add(
+                                                item.lineExGst());
+
+                                continue;
+                        }
+
+                        if (item.amount() != null) {
+
+                                hasGenericAmount = true;
+
+                                possibleExGstSum = possibleExGstSum.add(
+                                                item.amount());
+
+                                continue;
+                        }
+
+                        return hasGenericAmount
+                                        ? GenericAmountMeaning.UNKNOWN
+                                        : GenericAmountMeaning.NONE;
+                }
+
+                if (!hasGenericAmount) {
+
+                        return GenericAmountMeaning.NONE;
+                }
+
+                if (isZero(gst)) {
+
+                        return GenericAmountMeaning.ZERO_GST;
+                }
+
+                if (subtotal != null
+                                && moneyMatches(
+                                                possibleExGstSum,
+                                                subtotal)) {
+
+                        return GenericAmountMeaning.EX_GST;
+                }
+
+                return GenericAmountMeaning.UNKNOWN;
         }
 
         private void validateHeader(
@@ -360,16 +434,13 @@ public class OpenAiInvoiceNormalizationService {
                         List<InvoiceLineItemReview> items,
                         List<String> warnings) {
 
-                /*
-                 * Header arithmetic.
-                 */
                 if (subtotal != null
                                 && gst != null
                                 && total != null) {
 
                         BigDecimal calculated = subtotal.add(gst);
 
-                        if (!closeEnough(
+                        if (!moneyMatches(
                                         calculated,
                                         total)) {
 
@@ -409,7 +480,7 @@ public class OpenAiInvoiceNormalizationService {
                                                         BigDecimal.ZERO,
                                                         BigDecimal::add);
 
-                        if (!closeEnough(
+                        if (!moneyMatches(
                                         extractedSubtotal,
                                         subtotal)) {
 
@@ -419,6 +490,11 @@ public class OpenAiInvoiceNormalizationService {
                         }
                 }
 
+                /*
+                 * These two checks are intentionally conditional.
+                 * Header-only GST invoices are valid even when each row
+                 * does not expose GST or a GST-inclusive line total.
+                 */
                 if (allGstPresent
                                 && gst != null) {
 
@@ -429,7 +505,7 @@ public class OpenAiInvoiceNormalizationService {
                                                         BigDecimal.ZERO,
                                                         BigDecimal::add);
 
-                        if (!closeEnough(
+                        if (!moneyMatches(
                                         extractedGst,
                                         gst)) {
 
@@ -449,7 +525,7 @@ public class OpenAiInvoiceNormalizationService {
                                                         BigDecimal.ZERO,
                                                         BigDecimal::add);
 
-                        if (!closeEnough(
+                        if (!moneyMatches(
                                         extractedTotal,
                                         total)) {
 
@@ -460,16 +536,6 @@ public class OpenAiInvoiceNormalizationService {
                 }
         }
 
-        /*
-         * Reconstruct a possible zero-GST subtotal from raw line items.
-         *
-         * Priority:
-         * 1. Use the raw generic amount when it exists.
-         * 2. Otherwise use quantity * unitPrice.
-         *
-         * We return null unless EVERY row can be reconstructed. This avoids
-         * deriving a subtotal from only a partial set of invoice items.
-         */
         private BigDecimal reconstructPossibleZeroGstSubtotal(
                         OpenAiRawInvoiceResponse raw) {
 
@@ -495,6 +561,7 @@ public class OpenAiInvoiceNormalizationService {
                         }
 
                         if (lineAmount == null) {
+
                                 return null;
                         }
 
@@ -503,6 +570,64 @@ public class OpenAiInvoiceNormalizationService {
                 }
 
                 return reconstructedSubtotal;
+        }
+
+        private boolean lineCalculationMatches(
+                        BigDecimal quantity,
+                        BigDecimal unitPrice,
+                        BigDecimal lineAmount) {
+
+                BigDecimal calculated = quantity.multiply(
+                                unitPrice);
+
+                BigDecimal roundingAllowance = quantity.abs()
+                                .multiply(
+                                                HALF_CENT)
+                                .add(
+                                                HALF_CENT);
+
+                BigDecimal allowedTolerance = roundingAllowance.max(
+                                MIN_LINE_CALCULATION_TOLERANCE);
+
+                return difference(
+                                calculated,
+                                lineAmount)
+                                .compareTo(
+                                                allowedTolerance) <= 0;
+        }
+
+        private boolean moneyMatches(
+                        BigDecimal first,
+                        BigDecimal second) {
+
+                if (first == null
+                                || second == null) {
+
+                        return false;
+                }
+
+                return difference(
+                                first,
+                                second)
+                                .compareTo(
+                                                MONEY_TOTAL_TOLERANCE) <= 0;
+        }
+
+        private BigDecimal difference(
+                        BigDecimal first,
+                        BigDecimal second) {
+
+                return first
+                                .subtract(second)
+                                .abs();
+        }
+
+        private boolean isZero(
+                        BigDecimal value) {
+
+                return value != null
+                                && value.compareTo(
+                                                BigDecimal.ZERO) == 0;
         }
 
         private int calculatePageCount(
@@ -514,34 +639,12 @@ public class OpenAiInvoiceNormalizationService {
                                 .filter(
                                                 page -> page != null
                                                                 && page > 0)
-                                .max(Integer::compareTo)
+                                .max(
+                                                Integer::compareTo)
                                 .orElse(
                                                 items.isEmpty()
                                                                 ? 0
                                                                 : 1);
-        }
-
-        private boolean closeEnough(
-                        BigDecimal first,
-                        BigDecimal second) {
-
-                if (first == null
-                                || second == null) {
-
-                        return false;
-                }
-
-                return first.subtract(second)
-                                .abs()
-                                .compareTo(TOLERANCE) <= 0;
-        }
-
-        private boolean isZero(
-                        BigDecimal value) {
-
-                return value != null
-                                && value.compareTo(
-                                                BigDecimal.ZERO) == 0;
         }
 
         private boolean isBlank(
