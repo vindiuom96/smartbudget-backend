@@ -16,35 +16,34 @@ import com.smartbudget.dto.SupplierResolution;
 @Service
 public class InvoiceValidationService {
 
-    /*
-     * Quantity x displayed unit price may differ slightly
-     * from the supplier's printed line amount because the
-     * supplier may use more decimal precision internally.
-     */
-    private static final BigDecimal LINE_CALCULATION_TOLERANCE = new BigDecimal("0.02");
+    private static final BigDecimal MONEY_TOTAL_TOLERANCE =
+            new BigDecimal("0.001");
 
-    /*
-     * Header totals and aggregate totals should agree
-     * to the cent.
-     *
-     * 0.001 means a $0.01 difference will fail.
-     */
-    private static final BigDecimal MONEY_TOTAL_TOLERANCE = new BigDecimal("0.001");
+    private static final BigDecimal MIN_LINE_CALCULATION_TOLERANCE =
+            new BigDecimal("0.02");
 
-    private final SupplierNormalizationService supplierNormalizationService;
+    private static final BigDecimal HALF_CENT =
+            new BigDecimal("0.005");
+
+    private final SupplierNormalizationService
+            supplierNormalizationService;
 
     public InvoiceValidationService(
             SupplierNormalizationService supplierNormalizationService) {
 
-        this.supplierNormalizationService = supplierNormalizationService;
+        this.supplierNormalizationService =
+                supplierNormalizationService;
     }
 
     public InvoiceValidationResult validate(
             InvoiceApprovalRequest request) {
 
-        List<String> warnings = new ArrayList<>();
+        List<String> warnings =
+                new ArrayList<>();
 
-        List<InvoiceItemValidationResponse> itemValidations = new ArrayList<>();
+        List<InvoiceItemValidationResponse>
+                itemValidations =
+                new ArrayList<>();
 
         if (request == null) {
 
@@ -84,8 +83,9 @@ public class InvoiceValidationService {
 
         } else {
 
-            SupplierResolution resolution = supplierNormalizationService.resolve(
-                    request.supplier());
+            SupplierResolution resolution =
+                    supplierNormalizationService.resolve(
+                            request.supplier());
 
             if (!resolution.recognized()) {
 
@@ -155,19 +155,14 @@ public class InvoiceValidationService {
                     "Invoice total cannot be negative.");
         }
 
-        /*
-         * Header financial relationship:
-         *
-         * subtotal + GST must match total
-         * to the cent.
-         */
         if (request.subtotalExGst() != null
                 && request.gst() != null
                 && request.total() != null) {
 
-            BigDecimal calculatedTotal = request.subtotalExGst()
-                    .add(
-                            request.gst());
+            BigDecimal calculatedTotal =
+                    request.subtotalExGst()
+                            .add(
+                                    request.gst());
 
             if (!moneyMatches(
                     calculatedTotal,
@@ -182,7 +177,8 @@ public class InvoiceValidationService {
     private void validateItems(
             InvoiceApprovalRequest request,
             List<String> warnings,
-            List<InvoiceItemValidationResponse> itemValidations) {
+            List<InvoiceItemValidationResponse>
+                    itemValidations) {
 
         if (request.items() == null
                 || request.items().isEmpty()) {
@@ -193,21 +189,28 @@ public class InvoiceValidationService {
             return;
         }
 
-        BigDecimal exGstSum = BigDecimal.ZERO;
+        BigDecimal exGstSum =
+                BigDecimal.ZERO;
 
-        BigDecimal gstSum = BigDecimal.ZERO;
+        BigDecimal gstSum =
+                BigDecimal.ZERO;
 
-        BigDecimal totalSum = BigDecimal.ZERO;
+        BigDecimal totalSum =
+                BigDecimal.ZERO;
 
         boolean canValidateExGstSum = true;
         boolean canValidateGstSum = true;
         boolean canValidateTotalSum = true;
 
-        for (int index = 0; index < request.items().size(); index++) {
+        for (int index = 0;
+                index < request.items().size();
+                index++) {
 
-            InvoiceApprovalLineItem item = request.items().get(index);
+            InvoiceApprovalLineItem item =
+                    request.items().get(index);
 
-            List<String> itemWarnings = validateItem(item);
+            List<String> itemWarnings =
+                    validateItem(item);
 
             if (!itemWarnings.isEmpty()) {
 
@@ -217,9 +220,6 @@ public class InvoiceValidationService {
                                 itemWarnings));
             }
 
-            /*
-             * Avoid dereferencing a missing item.
-             */
             if (item == null) {
 
                 canValidateExGstSum = false;
@@ -231,8 +231,9 @@ public class InvoiceValidationService {
 
             if (item.lineExGst() != null) {
 
-                exGstSum = exGstSum.add(
-                        item.lineExGst());
+                exGstSum =
+                        exGstSum.add(
+                                item.lineExGst());
 
             } else {
 
@@ -241,8 +242,9 @@ public class InvoiceValidationService {
 
             if (item.gstValue() != null) {
 
-                gstSum = gstSum.add(
-                        item.gstValue());
+                gstSum =
+                        gstSum.add(
+                                item.gstValue());
 
             } else {
 
@@ -251,8 +253,9 @@ public class InvoiceValidationService {
 
             if (item.lineTotal() != null) {
 
-                totalSum = totalSum.add(
-                        item.lineTotal());
+                totalSum =
+                        totalSum.add(
+                                item.lineTotal());
 
             } else {
 
@@ -260,10 +263,6 @@ public class InvoiceValidationService {
             }
         }
 
-        /*
-         * Aggregate amounts must match the invoice
-         * totals to the cent.
-         */
         if (canValidateExGstSum
                 && request.subtotalExGst() != null
                 && !moneyMatches(
@@ -298,7 +297,8 @@ public class InvoiceValidationService {
     private List<String> validateItem(
             InvoiceApprovalLineItem item) {
 
-        List<String> warnings = new ArrayList<>();
+        List<String> warnings =
+                new ArrayList<>();
 
         if (item == null) {
 
@@ -350,64 +350,46 @@ public class InvoiceValidationService {
                     "Ex GST amount cannot be negative.");
         }
 
-        if (item.gstValue() == null) {
-
-            warnings.add(
-                    "GST amount is required.");
-
-        } else if (isNegative(
-                item.gstValue())) {
+        /*
+         * Line GST and line total are optional.
+         * When present they still receive validation.
+         */
+        if (item.gstValue() != null
+                && isNegative(
+                        item.gstValue())) {
 
             warnings.add(
                     "GST amount cannot be negative.");
         }
 
-        if (item.lineTotal() == null) {
-
-            warnings.add(
-                    "Line total is required.");
-
-        } else if (isNegative(
-                item.lineTotal())) {
+        if (item.lineTotal() != null
+                && isNegative(
+                        item.lineTotal())) {
 
             warnings.add(
                     "Line total cannot be negative.");
         }
 
-        /*
-         * quantity x unitPrice ~= lineExGst
-         *
-         * This is the one calculation where we allow
-         * a small rounding tolerance.
-         */
         if (item.quantity() != null
                 && item.unitPrice() != null
-                && item.lineExGst() != null) {
+                && item.lineExGst() != null
+                && !lineCalculationMatches(
+                        item.quantity(),
+                        item.unitPrice(),
+                        item.lineExGst())) {
 
-            BigDecimal expectedExGst = item.quantity()
-                    .multiply(
-                            item.unitPrice());
-
-            if (!lineCalculationMatches(
-                    expectedExGst,
-                    item.lineExGst())) {
-
-                warnings.add(
-                        "Quantity x unit price does not match ex GST amount.");
-            }
+            warnings.add(
+                    "Quantity x unit price does not match ex GST amount.");
         }
 
-        /*
-         * Ex GST + GST must match line total
-         * to the cent.
-         */
         if (item.lineExGst() != null
                 && item.gstValue() != null
                 && item.lineTotal() != null) {
 
-            BigDecimal expectedTotal = item.lineExGst()
-                    .add(
-                            item.gstValue());
+            BigDecimal expectedTotal =
+                    item.lineExGst()
+                            .add(
+                                    item.gstValue());
 
             if (!moneyMatches(
                     expectedTotal,
@@ -422,14 +404,31 @@ public class InvoiceValidationService {
     }
 
     private boolean lineCalculationMatches(
-            BigDecimal first,
-            BigDecimal second) {
+            BigDecimal quantity,
+            BigDecimal unitPrice,
+            BigDecimal lineAmount) {
+
+        BigDecimal calculated =
+                quantity.multiply(
+                        unitPrice);
+
+        BigDecimal roundingAllowance =
+                quantity.abs()
+                        .multiply(
+                                HALF_CENT)
+                        .add(
+                                HALF_CENT);
+
+        BigDecimal allowedTolerance =
+                roundingAllowance.max(
+                        MIN_LINE_CALCULATION_TOLERANCE);
 
         return difference(
-                first,
-                second)
+                calculated,
+                lineAmount)
                 .compareTo(
-                        LINE_CALCULATION_TOLERANCE) <= 0;
+                        allowedTolerance)
+                <= 0;
     }
 
     private boolean moneyMatches(
@@ -440,7 +439,8 @@ public class InvoiceValidationService {
                 first,
                 second)
                 .compareTo(
-                        MONEY_TOTAL_TOLERANCE) <= 0;
+                        MONEY_TOTAL_TOLERANCE)
+                <= 0;
     }
 
     private BigDecimal difference(

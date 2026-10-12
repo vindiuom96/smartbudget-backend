@@ -11,112 +11,153 @@ import com.smartbudget.dto.SupplierResolution;
 @Service
 public class SupplierNormalizationService {
 
-    private record SupplierDefinition(
-            String supplierId,
-            String canonicalName) {
-    }
-
-    private final Map<String, SupplierDefinition> aliases = new HashMap<>();
-
-    public SupplierNormalizationService() {
-
-        /*
-         * CONAPAK
-         */
-        register(
-                "CONAPAK",
-                "CONAPAK Produce",
-                "CONAPAK Produce",
-                "CONAPAK PRODUCE");
-
-        /*
-         * SAJ
-         */
-        register(
-                "SAJ",
-                "SAJ Fruit Supply (Vic) Pty Ltd",
-                "SAJ Fruit Supply (Vic) Pty Ltd",
-                "SAJ Fruit Supply VIC Pty Ltd",
-                "SAJ Fruit Supply");
-
-        /*
-         * BIDFOOD
-         */
-        register(
-                "BIDFOOD",
-                "Bidfood",
-                "Bidfood",
-                "BIDFOOD",
-                "Bidfood Australia");
-    }
-
-    public SupplierResolution resolve(
-            String rawSupplierName) {
-
-        if (rawSupplierName == null
-                || rawSupplierName.isBlank()) {
-
-            return new SupplierResolution(
-                    null,
-                    null,
-                    rawSupplierName,
-                    false);
+        private record SupplierDefinition(
+                        String supplierId,
+                        String canonicalName) {
         }
 
-        String lookupKey = normalizeForLookup(rawSupplierName);
+        private final Map<String, SupplierDefinition> aliases = new HashMap<>();
 
-        SupplierDefinition supplier = aliases.get(lookupKey);
+        public SupplierNormalizationService() {
 
-        if (supplier == null) {
+                /*
+                 * CONAPAK
+                 */
+                register(
+                                "CONAPAK",
+                                "CONAPAK Produce",
+                                "CONAPAK Produce",
+                                "CONAPAK PRODUCE");
 
-            /*
-             * IMPORTANT:
-             *
-             * Do not fuzzy-match or guess.
-             *
-             * An unknown supplier must be confirmed
-             * by the chef later.
-             */
-            return new SupplierResolution(
-                    null,
-                    null,
-                    rawSupplierName,
-                    false);
+                /*
+                 * SAJ
+                 */
+                register(
+                                "SAJ",
+                                "SAJ Fruit Supply (Vic) Pty Ltd",
+                                "SAJ Fruit Supply (Vic) Pty Ltd",
+                                "SAJ Fruit Supply VIC Pty Ltd",
+                                "SAJ Fruit Supply");
+
+                /*
+                 * BIDFOOD
+                 */
+                register(
+                                "BIDFOOD",
+                                "Bidfood",
+                                "Bidfood",
+                                "BIDFOOD",
+                                "Bidfood Australia",
+                                "BIDFOOD TRUGANINA",
+                                "BIDFOOD TRUGANINA a division of P Manettas & Co Technical");
+
+                /*
+                 * PROCAL
+                 */
+                register(
+                                "PROCAL",
+                                "Procal Dairies Pty Ltd",
+                                "Procal Dairies Pty Ltd",
+                                "PROCAL DAIRIES PTY LTD",
+                                "Procal Dairies",
+                                "PROCAL DAIRIES");
+
+                /*
+                 * PETERS / AUSTRALASIAN FOOD GROUP
+                 */
+                register(
+                                "PETERS",
+                                "Peters Ice Cream",
+                                "Peters",
+                                "Peters Ice Cream",
+                                "Australasian Food Group Pty Ltd",
+                                "AUSTRALASIAN FOOD GROUP PTY LTD",
+                                "Trading as Peters Ice Cream",
+                                "Australasian Food Group Pty Ltd trading as Peters Ice Cream");
+
+                /*
+                 * UNIVERSITY MEAT
+                 */
+                register(
+                                "UNIVERSITYMEAT",
+                                "University Meat",
+                                "University Meat");
+                /*
+                 * M & J CHICKENS
+                 */
+                register(
+                                "MJCHICKENS",
+                                "M & J Chickens",
+                                "M & J Chickens");
         }
 
-        return new SupplierResolution(
-                supplier.supplierId(),
-                supplier.canonicalName(),
-                rawSupplierName,
-                true);
-    }
+        public SupplierResolution resolve(
+                        String rawSupplierName) {
 
-    private void register(
-            String supplierId,
-            String canonicalName,
-            String... supplierAliases) {
+                if (rawSupplierName == null
+                                || rawSupplierName.isBlank()) {
 
-        SupplierDefinition supplier = new SupplierDefinition(
-                supplierId,
-                canonicalName);
+                        return new SupplierResolution(
+                                        null,
+                                        null,
+                                        rawSupplierName,
+                                        false);
+                }
 
-        for (String alias : supplierAliases) {
+                String lookupKey = normalizeForLookup(rawSupplierName);
 
-            aliases.put(
-                    normalizeForLookup(alias),
-                    supplier);
+                SupplierDefinition supplier = aliases.get(lookupKey);
+
+                if (supplier == null) {
+
+                        /*
+                         * IMPORTANT:
+                         *
+                         * Do not fuzzy-match or guess.
+                         *
+                         * An unknown supplier must be confirmed
+                         * by the chef later.
+                         */
+                        return new SupplierResolution(
+                                        null,
+                                        null,
+                                        rawSupplierName,
+                                        false);
+                }
+
+                return new SupplierResolution(
+                                supplier.supplierId(),
+                                supplier.canonicalName(),
+                                rawSupplierName,
+                                true);
         }
-    }
 
-    private String normalizeForLookup(
-            String value) {
+        private void register(
+                        String supplierId,
+                        String canonicalName,
+                        String... supplierAliases) {
 
-        return value
-                .trim()
-                .toUpperCase(Locale.ROOT)
+                SupplierDefinition supplier = new SupplierDefinition(
+                                supplierId,
+                                canonicalName);
 
-                // punctuation differences should not
-                // create different suppliers
-                .replaceAll("[^A-Z0-9]", "");
-    }
+                for (String alias : supplierAliases) {
+
+                        aliases.put(
+                                        normalizeForLookup(alias),
+                                        supplier);
+                }
+        }
+
+        private String normalizeForLookup(
+                        String value) {
+
+                return value
+                                .trim()
+                                .toUpperCase(Locale.ROOT)
+
+                                // punctuation differences should not
+                                // create different suppliers
+                                .replaceAll("[^A-Z0-9]", "");
+        }
 }
