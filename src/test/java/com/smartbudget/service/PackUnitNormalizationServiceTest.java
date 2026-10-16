@@ -12,216 +12,242 @@ import com.smartbudget.dto.PackUnitNormalizationResult;
 
 class PackUnitNormalizationServiceTest {
 
-    private PackUnitNormalizationService service;
+        private PackUnitNormalizationService service;
 
-    @BeforeEach
-    void setUp() {
-        service = new PackUnitNormalizationService();
-    }
+        @BeforeEach
+        void setUp() {
+                service = new PackUnitNormalizationService();
+        }
 
-    @Test
-    void shouldNormalizeMjChickenTwoKgPackets() {
+        @Test
+        void shouldNormalizeMjChickenTwoKgPackets() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("3"),
-                "PKT",
-                "2KG",
-                new BigDecimal("41.70"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("3"),
+                                "PKT",
+                                "2KG",
+                                new BigDecimal("41.70"));
 
-        assertEquals(
-                0,
-                new BigDecimal("6")
-                        .compareTo(result.normalizedQuantity()));
+                assertEquals(
+                                0,
+                                new BigDecimal("6")
+                                                .compareTo(result.normalizedQuantity()));
 
-        assertEquals(
-                "KG",
-                result.normalizedUnit());
+                assertEquals(
+                                "KG",
+                                result.normalizedUnit());
 
-        assertEquals(
-                0,
-                new BigDecimal("6.9500")
-                        .compareTo(result.normalizedUnitPrice()));
-    }
+                assertEquals(
+                                0,
+                                new BigDecimal("6.9500")
+                                                .compareTo(result.normalizedUnitPrice()));
+        }
 
-    @Test
-    void shouldNormalizeBidfoodThirtyBy115GramCarton() {
+        @Test
+        void shouldNormalizeBidfoodThirtyBy115GramCarton() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("1"),
-                "CTN",
-                "30x115gr",
-                new BigDecimal("50.63"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("1"),
+                                "CTN",
+                                "30x115gr",
+                                new BigDecimal("50.63"));
 
-        assertEquals(
-                0,
-                new BigDecimal("3.45")
-                        .compareTo(result.normalizedQuantity()));
+                assertEquals(
+                                0,
+                                new BigDecimal("3.45")
+                                                .compareTo(result.normalizedQuantity()));
 
-        assertEquals(
-                "KG",
-                result.normalizedUnit());
+                assertEquals(
+                                "KG",
+                                result.normalizedUnit());
 
-        assertEquals(
-                0,
-                new BigDecimal("14.6754")
-                        .compareTo(result.normalizedUnitPrice()));
-    }
+                assertEquals(
+                                0,
+                                new BigDecimal("14.6754")
+                                                .compareTo(result.normalizedUnitPrice()));
+        }
 
-    @Test
-    void shouldNormalizeBidfoodFifteenDozenCartons() {
+        @Test
+        void shouldNormalizeBidfoodFifteenDozenCartons() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("2"),
-                "CTN",
-                "15doz",
-                new BigDecimal("106.52"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("2"),
+                                "CTN",
+                                "15doz",
+                                new BigDecimal("106.52"));
 
-        assertEquals(
-                0,
-                new BigDecimal("360")
-                        .compareTo(result.normalizedQuantity()));
+                assertEquals(
+                                0,
+                                new BigDecimal("360")
+                                                .compareTo(result.normalizedQuantity()));
 
-        assertEquals(
-                "EA",
-                result.normalizedUnit());
+                assertEquals(
+                                "EA",
+                                result.normalizedUnit());
 
-        assertEquals(
-                0,
-                new BigDecimal("0.2959")
-                        .compareTo(result.normalizedUnitPrice()));
-    }
+                assertEquals(
+                                0,
+                                new BigDecimal("0.2959")
+                                                .compareTo(result.normalizedUnitPrice()));
+        }
 
-    @Test
-    void shouldNormalizeProcalFourLitrePacks() {
+        @Test
+        void shouldNormalizeProcalFourLitrePacks() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("5"),
-                "EA",
-                "4L",
-                new BigDecimal("143.00"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("5"),
+                                "EA",
+                                "4L",
+                                new BigDecimal("143.00"));
 
-        assertEquals(
-                0,
-                new BigDecimal("20")
-                        .compareTo(result.normalizedQuantity()));
+                assertEquals(
+                                0,
+                                new BigDecimal("20")
+                                                .compareTo(result.normalizedQuantity()));
 
-        assertEquals(
-                "L",
-                result.normalizedUnit());
+                assertEquals(
+                                "L",
+                                result.normalizedUnit());
 
-        assertEquals(
-                0,
-                new BigDecimal("7.1500")
-                        .compareTo(result.normalizedUnitPrice()));
-    }
+                assertEquals(
+                                0,
+                                new BigDecimal("7.1500")
+                                                .compareTo(result.normalizedUnitPrice()));
+        }
 
-    @Test
-    void shouldKeepUniversityMeatKgQuantityAsAlreadyNormalized() {
+        @Test
+        void shouldKeepUniversityMeatKgQuantityAsAlreadyNormalized() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("5.46"),
-                "KG",
-                null,
-                new BigDecimal("96.59"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("5.46"),
+                                "KG",
+                                null,
+                                new BigDecimal("96.59"));
 
-        assertEquals(
-                0,
-                new BigDecimal("5.46")
-                        .compareTo(result.normalizedQuantity()));
+                assertEquals(
+                                0,
+                                new BigDecimal("5.46")
+                                                .compareTo(result.normalizedQuantity()));
 
-        assertEquals(
-                "KG",
-                result.normalizedUnit());
+                assertEquals(
+                                "KG",
+                                result.normalizedUnit());
 
-        assertEquals(
-                0,
-                new BigDecimal("17.6905")
-                        .compareTo(result.normalizedUnitPrice()));
-    }
+                assertEquals(
+                                0,
+                                new BigDecimal("17.6905")
+                                                .compareTo(result.normalizedUnitPrice()));
+        }
 
-    @Test
-    void shouldConvertFiveHundredGramPacksToKg() {
+        @Test
+        void shouldConvertFiveHundredGramPacksToKg() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("5"),
-                "PAT",
-                "500gr",
-                new BigDecimal("41.90"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("5"),
+                                "PAT",
+                                "500gr",
+                                new BigDecimal("41.90"));
 
-        assertEquals(
-                0,
-                new BigDecimal("2.5")
-                        .compareTo(result.normalizedQuantity()));
+                assertEquals(
+                                0,
+                                new BigDecimal("2.5")
+                                                .compareTo(result.normalizedQuantity()));
 
-        assertEquals(
-                "KG",
-                result.normalizedUnit());
+                assertEquals(
+                                "KG",
+                                result.normalizedUnit());
 
-        assertEquals(
-                0,
-                new BigDecimal("16.7600")
-                        .compareTo(result.normalizedUnitPrice()));
-    }
+                assertEquals(
+                                0,
+                                new BigDecimal("16.7600")
+                                                .compareTo(result.normalizedUnitPrice()));
+        }
 
-    @Test
-    void shouldNormalizeEachWhenNoPackSizeExists() {
+        @Test
+        void shouldNormalizeEachWhenNoPackSizeExists() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("3"),
-                "EA",
-                null,
-                new BigDecimal("40.65"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("3"),
+                                "EA",
+                                null,
+                                new BigDecimal("40.65"));
 
-        assertEquals(
-                0,
-                new BigDecimal("3")
-                        .compareTo(result.normalizedQuantity()));
+                assertEquals(
+                                0,
+                                new BigDecimal("3")
+                                                .compareTo(result.normalizedQuantity()));
 
-        assertEquals(
-                "EA",
-                result.normalizedUnit());
+                assertEquals(
+                                "EA",
+                                result.normalizedUnit());
 
-        assertEquals(
-                0,
-                new BigDecimal("13.5500")
-                        .compareTo(result.normalizedUnitPrice()));
-    }
+                assertEquals(
+                                0,
+                                new BigDecimal("13.5500")
+                                                .compareTo(result.normalizedUnitPrice()));
+        }
 
-    @Test
-    void shouldReturnUnresolvedForUnknownPack() {
+        @Test
+        void shouldReturnUnresolvedForUnknownPack() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                new BigDecimal("3"),
-                "PKT",
-                "ASSORTED",
-                new BigDecimal("30.00"));
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("3"),
+                                "PKT",
+                                "ASSORTED",
+                                new BigDecimal("30.00"));
 
-        assertNull(
-                result.normalizedQuantity());
+                assertNull(
+                                result.normalizedQuantity());
 
-        assertNull(
-                result.normalizedUnit());
+                assertNull(
+                                result.normalizedUnit());
 
-        assertNull(
-                result.normalizedUnitPrice());
-    }
+                assertNull(
+                                result.normalizedUnitPrice());
+        }
 
-    @Test
-    void shouldReturnUnresolvedWhenQuantityIsMissing() {
+        @Test
+        void shouldReturnUnresolvedWhenQuantityIsMissing() {
 
-        PackUnitNormalizationResult result = service.normalize(
-                null,
-                "PKT",
-                "2KG",
-                new BigDecimal("41.70"));
+                PackUnitNormalizationResult result = service.normalize(
+                                null,
+                                "PKT",
+                                "2KG",
+                                new BigDecimal("41.70"));
 
-        assertNull(
-                result.normalizedQuantity());
+                assertNull(
+                                result.normalizedQuantity());
 
-        assertNull(
-                result.normalizedUnit());
+                assertNull(
+                                result.normalizedUnit());
 
-        assertNull(
-                result.normalizedUnitPrice());
-    }
+                assertNull(
+                                result.normalizedUnitPrice());
+        }
+
+        @Test
+        void shouldNormalizePackSizeWhenPackagingUnitIsRepeated() {
+
+                PackUnitNormalizationResult result = service.normalize(
+                                new BigDecimal("4"),
+                                "PKT",
+                                "2KG PKT",
+                                new BigDecimal("93.60"));
+
+                assertEquals(
+                                0,
+                                new BigDecimal("8")
+                                                .compareTo(
+                                                                result.normalizedQuantity()));
+
+                assertEquals(
+                                "KG",
+                                result.normalizedUnit());
+
+                assertEquals(
+                                0,
+                                new BigDecimal("11.7000")
+                                                .compareTo(
+                                                                result.normalizedUnitPrice()));
+        }
 }

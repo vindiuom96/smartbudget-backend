@@ -74,6 +74,9 @@ public class InvoiceDetailsService {
                 item.getLineExGst(),
                 item.getGstValue(),
                 item.getLineTotal(),
+                item.getNormalizedQuantity(),
+                item.getNormalizedUnit(),
+                item.getNormalizedUnitPrice(),
                 item.getPageNumber());
     }
 }

@@ -8,10 +8,16 @@ public record InvoiceDetailsLineItemResponse(
         String brand,
         String packSize,
         String unit,
+
         BigDecimal quantity,
         BigDecimal unitPrice,
         BigDecimal lineExGst,
         BigDecimal gstValue,
         BigDecimal lineTotal,
+
+        BigDecimal normalizedQuantity,
+        String normalizedUnit,
+        BigDecimal normalizedUnitPrice,
+
         Integer pageNumber) {
 }
