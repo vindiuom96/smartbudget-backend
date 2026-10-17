@@ -88,7 +88,8 @@ public class SupplierNormalizationService {
                 register(
                                 "MJCHICKENS",
                                 "M & J Chickens",
-                                "M & J Chickens");
+                                "M & J Chickens",
+                                "M&J Chickens Pty Limited");
         }
 
         public SupplierResolution resolve(
