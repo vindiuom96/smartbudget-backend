@@ -8,6 +8,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.smartbudget.dto.InvoiceDetailsLineItemResponse;
 import com.smartbudget.dto.InvoiceDetailsResponse;
+import com.smartbudget.dto.PackUnitNormalizationResult;
 import com.smartbudget.model.InvoiceEntity;
 import com.smartbudget.model.InvoiceLineItemEntity;
 import com.smartbudget.repository.InvoiceRepository;
@@ -16,11 +17,14 @@ import com.smartbudget.repository.InvoiceRepository;
 public class InvoiceDetailsService {
 
         private final InvoiceRepository invoiceRepository;
+        private final PackUnitNormalizationService packUnitNormalizationService;
 
         public InvoiceDetailsService(
-                        InvoiceRepository invoiceRepository) {
+                        InvoiceRepository invoiceRepository,
+                        PackUnitNormalizationService packUnitNormalizationService) {
 
                 this.invoiceRepository = invoiceRepository;
+                this.packUnitNormalizationService = packUnitNormalizationService;
         }
 
         public InvoiceDetailsResponse getInvoice(
@@ -64,6 +68,40 @@ public class InvoiceDetailsService {
         private InvoiceDetailsLineItemResponse toLineItemResponse(
                         InvoiceLineItemEntity item) {
 
+                var normalizedQuantity = item.getNormalizedQuantity();
+
+                var normalizedUnit = item.getNormalizedUnit();
+
+                var normalizedUnitPrice = item.getNormalizedUnitPrice();
+
+                /*
+                 * Legacy invoice fallback.
+                 *
+                 * Older invoices may have been saved before
+                 * support for pack formats such as "2 Litre"
+                 * was added.
+                 *
+                 * Recalculate normalized values when they
+                 * are missing instead of requiring the
+                 * invoice to be uploaded again.
+                 */
+                if (normalizedQuantity == null
+                                || normalizedUnit == null
+                                || normalizedUnitPrice == null) {
+
+                        PackUnitNormalizationResult normalization = packUnitNormalizationService.normalize(
+                                        item.getQuantity(),
+                                        item.getUnit(),
+                                        item.getPackSize(),
+                                        item.getLineExGst());
+
+                        normalizedQuantity = normalization.normalizedQuantity();
+
+                        normalizedUnit = normalization.normalizedUnit();
+
+                        normalizedUnitPrice = normalization.normalizedUnitPrice();
+                }
+
                 return new InvoiceDetailsLineItemResponse(
                                 item.getProductCode(),
                                 item.getDescription(),
@@ -75,9 +113,11 @@ public class InvoiceDetailsService {
                                 item.getLineExGst(),
                                 item.getGstValue(),
                                 item.getLineTotal(),
-                                item.getNormalizedQuantity(),
-                                item.getNormalizedUnit(),
-                                item.getNormalizedUnitPrice(),
+
+                                normalizedQuantity,
+                                normalizedUnit,
+                                normalizedUnitPrice,
+
                                 item.getPageNumber());
         }
 }
