@@ -24,7 +24,9 @@ public class PackUnitNormalizationService {
          * 6x2L
          */
         private static final Pattern MULTI_PACK_PATTERN = Pattern.compile(
-                        "^(\\d+(?:\\.\\d+)?)X(\\d+(?:\\.\\d+)?)(KG|G|GR|GM|L|LT|LTR|ML|DOZ)$");
+                        "^(\\d+(?:\\.\\d+)?)X" +
+                                        "(\\d+(?:\\.\\d+)?)" +
+                                        "(KG|G|GR|GM|L|LT|LTR|LITRE|LITRES|LITER|LITERS|ML|DOZ|BUNCH|BUNCHES)$");
 
         /*
          * Examples:
@@ -33,9 +35,38 @@ public class PackUnitNormalizationService {
          * 4L
          * 1.5KG
          * 15DOZ
+         * 3BUNCH
          */
         private static final Pattern SIMPLE_PACK_PATTERN = Pattern.compile(
-                        "^(\\d+(?:\\.\\d+)?)(KG|G|GR|GM|L|LT|LTR|ML|DOZ)$");
+                        "^(\\d+(?:\\.\\d+)?)" +
+                                        "(KG|G|GR|GM|L|LT|LTR|LITRE|LITRES|LITER|LITERS|ML|DOZ|BUNCH|BUNCHES)$");
+
+        /*
+         * Handles descriptive pack sizes where the physical
+         * measurement appears at the end.
+         *
+         * Examples:
+         *
+         * 1 Box (8kg)
+         * 1 Box - 8kg
+         * 1 Pn (250g)
+         * 1 Pn x 250g
+         *
+         * After normalization these become:
+         *
+         * 1BOX8KG
+         * 1BOX8KG
+         * 1PN250G
+         * 1PNX250G
+         *
+         * We then extract:
+         *
+         * 8KG
+         * 250G
+         */
+        private static final Pattern TRAILING_MEASURE_PATTERN = Pattern.compile(
+                        ".*?(\\d+(?:\\.\\d+)?)" +
+                                        "(KG|G|GR|GM|L|LT|LTR|LITRE|LITRES|LITER|LITERS|ML|BUNCH|BUNCHES)$");
 
         public PackUnitNormalizationResult normalize(
                         BigDecimal quantity,
@@ -58,13 +89,14 @@ public class PackUnitNormalizationService {
                  * quantity = 5.46
                  * unit = KG
                  *
-                 * That already means 5.46 KG.
+                 * -> 5.46 KG
                  */
                 Measure directMeasure = normalizeDirectMeasurement(
                                 quantity,
                                 unit);
 
                 if (directMeasure != null) {
+
                         return buildResult(
                                         directMeasure.quantity(),
                                         directMeasure.unit(),
@@ -79,11 +111,19 @@ public class PackUnitNormalizationService {
                  * unit = PKT
                  * packSize = 2KG
                  *
-                 * 3 x 2 KG = 6 KG.
+                 * -> 3 x 2 KG
+                 * -> 6 KG
                  */
                 Measure packMeasure = parsePackSize(
                                 packSize,
                                 unit);
+
+                if (packMeasure == null) {
+
+                        packMeasure = parsePackSize(
+                                        unit,
+                                        null);
+                }
 
                 if (packMeasure != null) {
 
@@ -97,14 +137,14 @@ public class PackUnitNormalizationService {
                 }
 
                 /*
-                 * EA is usable when there is no measurable pack size.
+                 * EA is usable when there is no measurable
+                 * pack size.
                  *
                  * Example:
                  * quantity = 3
                  * unit = EA
-                 * packSize = null
                  *
-                 * -> 3 EA.
+                 * -> 3 EA
                  */
                 if (isEach(unit)) {
 
@@ -115,7 +155,9 @@ public class PackUnitNormalizationService {
                 }
 
                 /*
-                 * We cannot safely determine a normalized quantity.
+                 * We cannot safely determine a normalized
+                 * quantity.
+                 *
                  * Do not guess.
                  */
                 return unresolved();
@@ -125,7 +167,9 @@ public class PackUnitNormalizationService {
                         BigDecimal quantity,
                         String unit) {
 
-                if (unit == null || unit.isBlank()) {
+                if (unit == null ||
+                                unit.isBlank()) {
+
                         return null;
                 }
 
@@ -175,6 +219,25 @@ public class PackUnitNormalizationService {
                                                                 TWELVE),
                                                 "EA");
 
+                        /*
+                         * A bunch cannot safely be converted to
+                         * KG or EA because its physical contents
+                         * are unknown.
+                         *
+                         * Keep it as its own comparison unit.
+                         */
+                        case "BUNCH",
+                                        "BUNCHES" ->
+                                new Measure(
+                                                quantity,
+                                                "BUNCH");
+
+                        case "BAG",
+                                        "BAGS" ->
+                                new Measure(
+                                                quantity,
+                                                "BAG");
+
                         default -> null;
                 };
         }
@@ -189,27 +252,44 @@ public class PackUnitNormalizationService {
                         return null;
                 }
 
+                /*
+                 * normalizeText:
+                 *
+                 * "1 Box (8kg)"
+                 * -> "1BOX(8KG)"
+                 *
+                 * Then remove formatting characters:
+                 *
+                 * -> "1BOX8KG"
+                 *
+                 * This allows different supplier formatting
+                 * styles to be treated identically.
+                 */
                 String normalized = normalizeText(packSize)
-                                .replace("×", "X");
+                                .replace("×", "X")
+                                .replaceAll(
+                                                "[^A-Z0-9.X]",
+                                                "");
 
                 /*
                  * Some suppliers repeat the packaging unit
                  * inside the pack-size field.
                  *
                  * Example:
+                 *
                  * packSize = "2KG PKT"
                  * unit = "PKT"
                  *
-                 * After normalization:
-                 * "2KGPKT"
+                 * -> 2KGPKT
                  *
-                 * Strip the trailing PKT so that the physical
-                 * pack size can still be parsed as 2KG.
+                 * Strip the trailing PKT so the physical
+                 * measurement can be parsed as 2KG.
                  */
                 if (invoiceUnit != null
                                 && !invoiceUnit.isBlank()) {
 
-                        String normalizedInvoiceUnit = normalizeText(invoiceUnit);
+                        String normalizedInvoiceUnit = normalizeText(
+                                        invoiceUnit);
 
                         if (!normalizedInvoiceUnit.isBlank()
                                         && normalized.endsWith(
@@ -223,6 +303,14 @@ public class PackUnitNormalizationService {
                         }
                 }
 
+                /*
+                 * First try a normal multi-pack.
+                 *
+                 * Examples:
+                 *
+                 * 30X115GR
+                 * 6X2L
+                 */
                 Matcher multiMatcher = MULTI_PACK_PATTERN.matcher(
                                 normalized);
 
@@ -250,6 +338,15 @@ public class PackUnitNormalizationService {
                                         oneItem.unit());
                 }
 
+                /*
+                 * Then try a simple physical pack.
+                 *
+                 * Examples:
+                 *
+                 * 2KG
+                 * 500G
+                 * 4L
+                 */
                 Matcher simpleMatcher = SIMPLE_PACK_PATTERN.matcher(
                                 normalized);
 
@@ -259,6 +356,34 @@ public class PackUnitNormalizationService {
                                         simpleMatcher.group(1));
 
                         String unit = simpleMatcher.group(2);
+
+                        return convertToBaseUnit(
+                                        size,
+                                        unit);
+                }
+
+                /*
+                 * Finally support descriptive supplier formats.
+                 *
+                 * Examples:
+                 *
+                 * 1BOX8KG
+                 * 1PN250G
+                 * 1PNX250G
+                 *
+                 * We intentionally use the final physical
+                 * measurement rather than trying to understand
+                 * supplier-specific words such as BOX or PN.
+                 */
+                Matcher trailingMatcher = TRAILING_MEASURE_PATTERN.matcher(
+                                normalized);
+
+                if (trailingMatcher.matches()) {
+
+                        BigDecimal size = new BigDecimal(
+                                        trailingMatcher.group(1));
+
+                        String unit = trailingMatcher.group(2);
 
                         return convertToBaseUnit(
                                         size,
@@ -289,7 +414,11 @@ public class PackUnitNormalizationService {
 
                         case "L",
                                         "LT",
-                                        "LTR" ->
+                                        "LTR",
+                                        "LITRE",
+                                        "LITRES",
+                                        "LITER",
+                                        "LITERS" ->
                                 new Measure(
                                                 value,
                                                 "L");
@@ -305,6 +434,12 @@ public class PackUnitNormalizationService {
                                                 value.multiply(
                                                                 TWELVE),
                                                 "EA");
+
+                        case "BUNCH",
+                                        "BUNCHES" ->
+                                new Measure(
+                                                value,
+                                                "BUNCH");
 
                         default -> null;
                 };
@@ -361,7 +496,9 @@ public class PackUnitNormalizationService {
                 return value
                                 .trim()
                                 .toUpperCase(Locale.ROOT)
-                                .replaceAll("\\s+", "");
+                                .replaceAll(
+                                                "\\s+",
+                                                "");
         }
 
         private record Measure(

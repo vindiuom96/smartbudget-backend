@@ -26,12 +26,18 @@ public class ProductPurchaseHistoryController {
     public ProductPurchaseHistoryResponse getProductHistory(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam String supplierId,
-            @RequestParam String productCode) {
+            @RequestParam(required = false) String productCode,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) String packSize) {
 
         return productPurchaseHistoryService
                 .getProductHistory(
                         jwt.getSubject(),
                         supplierId,
-                        productCode);
+                        productCode,
+                        description,
+                        brand,
+                        packSize);
     }
 }
